@@ -1,6 +1,6 @@
 class Version < ActiveRecord::Base
   def long
-    short_version.split('.').map{|s| s.to_i}.map{|i| i.to_s.rjust(2, '0')}.join + build.to_s.rjust(6, '0')
+    short_version.to_s.split('.').map{|s| s.to_i}.map{|i| i.to_s.rjust(2, '0')}.join + build.to_s.rjust(6, '0')
   end
   
   def hex
@@ -8,6 +8,10 @@ class Version < ActiveRecord::Base
   end
   
   def dot
-    short_version + '.' + build.to_s
+    if short_version
+      short_version + '.' + build.to_s
+    else
+      build.to_s
+    end
   end
 end

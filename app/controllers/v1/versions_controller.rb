@@ -17,6 +17,7 @@ class V1::VersionsController < ApplicationController
  
 private
   def version_params
-    params.permit(:identifier, :short_version)
+    version_params = params.permit(:identifier, :short_version)
+    { identifier: version_params[:identifier], short_version: version_params[:short_version] }
   end
 end
