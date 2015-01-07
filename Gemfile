@@ -1,6 +1,6 @@
 source 'https://rubygems.org'
 
-ruby "2.1.0", :engine => "rbx", :engine_version => "2.2.10"
+ruby "2.2.0"
 
 
 # Bundle edge Rails instead: gem 'rails', github: 'rails/rails'
@@ -32,7 +32,7 @@ gem 'sdoc', '~> 0.4.0',          group: :doc
 # gem 'bcrypt', '~> 3.1.7'
 
 # Use puma as the app server
-gem 'puma', '~> 2.9.1'
+# gem 'puma', '~> 2.9.1'
 gem 'foreman'
 
 # Use Capistrano for deployment
