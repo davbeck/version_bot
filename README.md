@@ -16,60 +16,67 @@ thingy.
 
 # Integration with Xcode
 
-You can automagically increment you build numbers in your iOS/Mac app using a build script.
+You can automagically increment your build numbers in your iOS/Mac app using a build script.
 
 1. Create an Aggregate target. Call it something like "Build Number".
 
 2. Add a Run Script build phase to that.
 
-3. Change the Shell to `/usr/bin/ruby`.
+	Alternatively you could create a Run Script build phase on your primary target, just make sure it is the first build phase.
 
 3. Add the following script:
 
-        require 'net/http'
-        require 'json'
+	````ruby
+	#!/usr/bin/env ruby
+	#encoding: utf-8
+	
+	require 'net/http'
+	require 'json'
+	require 'plist'
+	
+	notation = "dot"
+	
+	
+	Dir.chdir ENV['PROJECT_DIR']
+	
+	git_id = `git rev-parse --short HEAD`
+	
+	build_number = if ENV['CONFIGURATION'] == 'Release'
+	  infoPlist = Plist::parse_xml ENV['INFOPLIST_FILE']
+	
+	  bundle_id = ENV['PRODUCT_BUNDLE_IDENTIFIER']
+	  version_name = infoPlist['CFBundleShortVersionString']
+	
+	  result = JSON.parse Net::HTTP.post_form(URI.parse("http://version-bot.herokuapp.com/v1/versions"), {'identifier' => bundle_id, 'short_version' => version_name}).body
+	  `git tag v#{result['dot']}`
+	  result[notation]
+	else
+	  "#{version_name}.#{git_id}"
+	end
+	
+	File.open(File.join(ENV['PROJECT_TEMP_DIR'], 'info.h'), 'w') do |f|
+	  f.write "#define BUILD_NUMBER #{build_number}\n"
+	  f.write "#define GIT_ID #{git_id}\n"
+	end
+	````
+
+	Alternatively, I like to make my build scripts separate files since they are easier to edit and maintain. For instance, I place my scripts like this in the bin folder at the root of my project and then call it from Xcode with `$PROJECT_DIR/bin/version_bot.rb`.
+    
+    This script will fetch the current build number for the app and short version. An important note, it only fetches the build number for the Release configuration (Archive). This way, your debug builds won't be slowed down. In that case, the script will just the git hash as a placeholder version number.
+    
+    This script uses "dot" version notation. You can change this by changing the line `notation = "dot"`.
+    
+4. In your target's "Build Settings", change "INFOPLIST_PREFIX_HEADER" or "Info.plist Preprocessor Prefix File" to "$PROJECT_TEMP_DIR/info.h". Change "INFOPLIST_PREPROCESS" or "Preprocess Info.plist File" to Yes.
+
+	This tells Xcode to look at the info.h file for dynamic values to replace in your app's info.plist file. The script above generates info.h, which includes the build number.
+    
+5. Finally, in your Info.plist file, change "CFBundleVersion" or "" to "BUILD_NUMBER", which will be replaced with the full build number each time Xcode builds.
 
 
-        Dir.chdir ENV['PROJECT_DIR']
-
-        branch = `git rev-parse --abbrev-ref HEAD`.strip
-        version = `git rev-parse --short HEAD`
-        bundle_id = if ENV['CONFIGURATION'] == 'Beta'
-          "com.ThinkUltimate.KidsCheckIn.beta.#{branch.split('/').last}"
-        else
-          "com.ThinkUltimate.KidsCheckIn"
-        end
-
-        version_name = branch.split('/').last.split('-').last
-        display_name = if ENV['CONFIGURATION'] == 'Beta'
-          "Check-In #{version_name}"
-        else
-          "Check-In"
-        end
-
-        build_number = if ENV['CONFIGURATION'] == 'Beta'
-          result = JSON.parse Net::HTTP.post_form(URI.parse("http://version-bot.herokuapp.com/v1/versions"), {'identifier' => bundle_id}).body
-          `git tag v#{version_name}-#{result['build']}`
-          result['build']
-        elsif ENV['CONFIGURATION'] == 'Release'
-          result = JSON.parse Net::HTTP.post_form(URI.parse("http://version-bot.herokuapp.com/v1/versions"), {'identifier' => bundle_id, 'short_version' => version_name}).body
-          `git tag v#{result['long']}`
-          result['dot']
-        else
-          "1.0.0.0"
-        end
-
-        File.open(File.join(ENV['PROJECT_TEMP_DIR'], 'info.h'), 'w') do |f|
-          f.write "#define BUNDLE_ID #{bundle_id}\n"
-          f.write "#define DISPLAY_NAME #{display_name}\n"
-          f.write "#define VERSION_NAME #{version_name}\n"
-          f.write "#define BUILD_NUMBER #{build_number}\n"
-          f.write "#define GIT_ID #{version}\n"
-        end
 
 # Using the service
 
-You can use the public server at `http://version-bot.herokuapp.com/`.
+You can use the public server at `https://version-bot.herokuapp.com/`.
 
 ## Parameters
 
@@ -89,7 +96,6 @@ All endpoints take the following parameters:
 	are counted separate from other short versions (e.g. 1.4.2 is at build 23 and 1.5.0 is at build
 	18). If not included, build numbers will be counted globally for the identifier. Build numbers
 	are counted independently for requests without and with version numbers.
-
 ## Get current build number
 
     GET /v1/versions
@@ -122,13 +128,41 @@ The build number will be incremented by 1 and returned.
 ### Result
 
     {
-        "hex": "260256cc2",
-        "dot": "1.2.3.2",
-        "short_version": "1.2.3",
-        "long": "010203000002",
-        "build": 2,
         "identifier": "com.ThinkUltimate.CoolApp"
+        "short_version": "1.2.3",
+        "build": 2,
+        "dot": "1.2.3.2",
+        "long": "010203000002",
+        "hex": "260256cc2",
     }
+
+- identifier
+
+	The provided identifier.
+
+- short_version
+
+	The provided short_version.
+
+- build
+
+	The raw build number for the identifier and short_version.
+
+- dot
+
+	In this example, the first 3 numbers are your short version number, taken from your Info.plist file, while the 4th is the server provided build number.
+
+- long
+
+	This is useful if you have been using a different build numbering scheme and need to force really large build numbers (of course, any future schemes will be forced to be even larger). It is created by taking the short version, padding each number with 2 digits (turning 2 into 02, but leaving 21 as is) and then padding the build number by 6 digits.
+	
+- hex
+
+	Generated from the long scheme and converted to base 16.
+
+
+
+    
 
 ## Set the build number
 
@@ -150,4 +184,6 @@ In addition to the standard parameters, it also takes `build`. The build number 
         "build": 123,
         "identifier": "com.ThinkUltimate.CoolApp"
     }
+
+
 
