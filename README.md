@@ -18,59 +18,25 @@ thingy.
 
 You can automagically increment your build numbers in your iOS/Mac app using a build script.
 
-1. Create an Aggregate target. Call it something like "Build Number".
+1. Select your scheme and open the editor:
 
-2. Add a Run Script build phase to that.
+	![Edit Scheme](https://davbeck.s3.amazonaws.com/version_bot/edit_scheme.png)
 
-	Alternatively you could create a Run Script build phase on your primary target, just make sure it is the first build phase.
+2. Under Build > Pre-actions, click the plus button and select "New Run Script Action". Select your apps target under "Provide build settings from". Then paste in `$PROJECT_DIR/bin/version_bot.rb` and add [version_bot.rb](version_bot.rb) to the bin folder in your projects root directy, creating the folder if needed.
 
-3. Add the following script:
-
-	````ruby
-	#!/usr/bin/env ruby
-	#encoding: utf-8
+	![Add Pre-Action](https://davbeck.s3.amazonaws.com/version_bot/pre_action.png)
 	
-	require 'net/http'
-	require 'json'
-	require 'plist'
-	
-	notation = "dot"
-	
-	
-	Dir.chdir ENV['PROJECT_DIR']
-	
-	git_id = `git rev-parse --short HEAD`
-	
-	build_number = if ENV['CONFIGURATION'] == 'Release'
-	  infoPlist = Plist::parse_xml ENV['INFOPLIST_FILE']
-	
-	  bundle_id = ENV['PRODUCT_BUNDLE_IDENTIFIER']
-	  version_name = infoPlist['CFBundleShortVersionString']
-	
-	  result = JSON.parse Net::HTTP.post_form(URI.parse("http://version-bot.herokuapp.com/v1/versions"), {'identifier' => bundle_id, 'short_version' => version_name}).body
-	  `git tag v#{result['dot']}`
-	  result[notation]
-	else
-	  "#{version_name}.#{git_id}"
-	end
-	
-	File.open(File.join(ENV['PROJECT_TEMP_DIR'], 'info.h'), 'w') do |f|
-	  f.write "#define BUILD_NUMBER #{build_number}\n"
-	  f.write "#define GIT_ID #{git_id}\n"
-	end
-	````
-
-	Alternatively, I like to make my build scripts separate files since they are easier to edit and maintain. For instance, I place my scripts like this in the bin folder at the root of my project and then call it from Xcode with `$PROJECT_DIR/bin/version_bot.rb`.
+	Alternatively, you could copy the entire contents of the script into Xcode directly.
     
     This script will fetch the current build number for the app and short version. An important note, it only fetches the build number for the Release configuration (Archive). This way, your debug builds won't be slowed down. In that case, the script will just the git hash as a placeholder version number.
     
     This script uses "dot" version notation. You can change this by changing the line `notation = "dot"`.
     
-4. In your target's "Build Settings", change "INFOPLIST_PREFIX_HEADER" or "Info.plist Preprocessor Prefix File" to "$PROJECT_TEMP_DIR/info.h". Change "INFOPLIST_PREPROCESS" or "Preprocess Info.plist File" to Yes.
+3. In your target's "Build Settings", change "INFOPLIST_PREFIX_HEADER" or "Info.plist Preprocessor Prefix File" to "$PROJECT_TEMP_DIR/info.h". Change "INFOPLIST_PREPROCESS" or "Preprocess Info.plist File" to Yes.
 
 	This tells Xcode to look at the info.h file for dynamic values to replace in your app's info.plist file. The script above generates info.h, which includes the build number.
     
-5. Finally, in your Info.plist file, change "CFBundleVersion" or "" to "BUILD_NUMBER", which will be replaced with the full build number each time Xcode builds.
+4. Finally, in your Info.plist file, change "CFBundleVersion" or "" to "BUILD_NUMBER", which will be replaced with the full build number each time Xcode builds.
 
 
 
