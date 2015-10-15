@@ -76,7 +76,7 @@ You can automagically increment your build numbers in your iOS/Mac app using a b
 
 # Using the service
 
-You can use the public server at `https://version-bot.herokuapp.com/`.
+You can use the public server at [`https://version-bot.herokuapp.com/`](https://version-bot.herokuapp.com/).
 
 ## Parameters
 
